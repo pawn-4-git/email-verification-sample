@@ -1,0 +1,14 @@
+/app/src/main/java/com/example/emailverification/EmailVerificationApplication.java
+/app/src/main/java/com/example/emailverification/controller/MockIssuerController.java
+/app/src/main/java/com/example/emailverification/controller/VerificationController.java
+/app/src/main/java/com/example/emailverification/model/IssuerMetadata.java
+/app/src/main/java/com/example/emailverification/model/OtpVerificationRequest.java
+/app/src/main/java/com/example/emailverification/model/SdJwtParsed.java
+/app/src/main/java/com/example/emailverification/model/VerificationAuditStep.java
+/app/src/main/java/com/example/emailverification/model/VerificationRequest.java
+/app/src/main/java/com/example/emailverification/model/VerificationResult.java
+/app/src/main/java/com/example/emailverification/service/DnsResolverService.java
+/app/src/main/java/com/example/emailverification/service/IssuerDiscoveryService.java
+/app/src/main/java/com/example/emailverification/service/MockIssuerService.java
+/app/src/main/java/com/example/emailverification/service/OtpService.java
+/app/src/main/java/com/example/emailverification/service/TokenVerificationService.java

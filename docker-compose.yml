@@ -1,0 +1,13 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: email-verification-app
+    ports:
+      - "8080:8080"
+    environment:
+      - VERIFIER_ORIGIN=http://localhost:8080
+      - ISSUER_ORIGIN=http://localhost:8080
+      - ORIGIN_TRIAL_TOKEN=${ORIGIN_TRIAL_TOKEN}
+    restart: unless-stopped

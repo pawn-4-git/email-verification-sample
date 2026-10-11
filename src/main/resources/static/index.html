@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <!-- __ORIGIN_TRIAL_META__ -->
+  <title>Chrome メール確認プロトコル (EVP) 検証デモ | Spring Boot</title>
+  <meta name="description"
+    content="Chrome メール確認 (Email Verification Protocol / RFC 9901 SD-JWT+KB) 2026年10月更新仕様に準拠したJava Spring Boot実装">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap"
+    rel="stylesheet">
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+
+<body>
+  <div class="container">
+    <header class="app-header">
+      <div class="header-badge">
+        <span class="pulse"></span>
+        Chrome 154+ / RFC 9901 SD-JWT (2026年10月更新対応)
+      </div>
+      <h1 class="app-title">Chrome メール認証プロトコル</h1>
+      <p class="app-subtitle">
+        ワンタイムパスワードや確認リンクに依存せず、ブラウザとメールプロバイダ間の暗号署名 (Selective Disclosure JWT) を用いてセキュアかつ即座にメールアドレスを検証するサーバーサイド (Java
+        Spring Boot) 実装です。
+      </p>
+    </header>
+
+    <div class="main-grid">
+      <!-- Left Column: Verification Form & Simulator -->
+      <section class="glass-card">
+        <h2 class="card-title">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
+            <polyline points="22,6 12,13 2,6" />
+          </svg>
+          メールアドレス確認フォーム
+        </h2>
+
+        <!-- Session & Nonce Status -->
+        <div class="session-info-bar">
+          <div class="session-info-item">
+            <span class="label">Session Nonce:</span>
+            <span class="value" id="session-nonce-display">__SESSION_NONCE__</span>
+            <button type="button" id="btn-refresh-nonce" class="btn-icon" title="ノンスを再生成">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67" />
+              </svg>
+            </button>
+          </div>
+          <div class="session-info-item">
+            <span class="label">Verifier Origin:</span>
+            <span class="value" id="verifier-origin-display">localhost:8080</span>
+          </div>
+        </div>
+
+        <!-- Semantic Verification Form -->
+        <form id="email-verify-form" action="/api/verify" method="POST">
+          <div class="form-group">
+            <label for="email-input" class="form-label">メールアドレス</label>
+            <input type="email" id="email-input" name="email" class="form-input" placeholder="user@example.com"
+              autocomplete="email" required>
+            <p class="form-hint">Chromeが認識する <code>autocomplete="email"</code> 属性が設定されています。</p>
+          </div>
+
+          <!-- Chrome Origin Trial notice banner -->
+          <div
+            style="background: rgba(56, 189, 248, 0.08); border: 1px solid rgba(56, 189, 248, 0.2); border-radius: var(--radius-sm); padding: 0.75rem 0.9rem; margin-bottom: 1.25rem; font-size: 0.8rem; color: var(--text-secondary);">
+            <div
+              style="font-weight: 600; color: var(--accent-blue); margin-bottom: 0.25rem; display: flex; align-items: center; gap: 0.35rem;">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="10" />
+                <line x1="12" y1="16" x2="12" y2="12" />
+                <line x1="12" y1="8" x2="12.01" y2="8" />
+              </svg>
+              トークンが自動入力されない場合について
+            </div>
+            Chromeが実際に外部プロバイダと通信してトークンを自動注入するには、<strong>Origin Trial 登録</strong> または <strong>起動フラグ</strong>
+            が必要です。ローカル環境ですぐに動作確認する場合は、下の「⚡ トークン生成・セット」または「Simulator Lab」をご利用ください。
+          </div>
+
+          <!-- Official Chrome EVP Hidden Input with autocomplete and initial nonce -->
+          <input type="hidden" id="token-hidden" name="token"
+            autocomplete="email-verification-token"
+            nonce="__SESSION_NONCE__">
+
+          <div class="form-group">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.45rem;">
+              <label for="token-input" class="form-label" style="margin-bottom: 0;">
+                メール確認トークン (EVT)
+              </label>
+              <div style="display: flex; gap: 0.5rem; align-items: center;">
+                <span id="token-status-badge" style="font-size: 0.72rem; padding: 0.2rem 0.5rem; border-radius: 9999px; background: rgba(148, 163, 184, 0.15); color: var(--text-muted); font-weight: 500;">
+                  未取得 (0文字)
+                </span>
+                <button type="button" id="btn-fill-token"
+                  style="background: rgba(56, 189, 248, 0.12); border: 1px solid rgba(56, 189, 248, 0.3); color: var(--accent-blue); padding: 0.25rem 0.65rem; border-radius: var(--radius-sm); font-size: 0.78rem; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 0.3rem;"
+                  title="入力されたメールアドレスに対応するSD-JWTトークンを生成してセットします">
+                  ⚡ トークン生成・セット
+                </button>
+              </div>
+            </div>
+            <textarea id="token-input" class="form-input form-textarea"
+              placeholder="&lt;Issuer-signed EVT&gt;~&lt;Key Binding JWT&gt; (Chromeによって自動入力されるか、上のボタンで生成)"></textarea>
+            <p class="form-hint">
+              Chrome が <code>autocomplete="email-verification-token"</code> の隠しフィールドに注入したトークンがここに同期表示されます。
+            </p>
+          </div>
+
+          <button type="submit" id="btn-submit-verify" class="btn btn-primary">
+            メールアドレスを確認する
+          </button>
+        </form>
+
+        <!-- Test Simulator Lab -->
+        <div class="simulator-section">
+          <div class="simulator-title">
+            <span>クイック動作テスト (Simulator Lab)</span>
+            <span style="font-size: 0.72rem; color: var(--accent-blue); text-transform: none;">Chrome
+              OT登録なしでも検証可能</span>
+          </div>
+          <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.85rem;">
+            組み込みモック発行者 (Mock Issuer) を使用して、本番ブラウザと同一の暗号トークンを生成・注入してテストできます。
+          </p>
+
+          <div class="simulator-buttons">
+            <button type="button" id="btn-sim-nokid" class="btn-sim" title="2026年10月更新: kid省略トークンの検証">
+              <strong>Gmail方式 (kid省略)</strong>
+              <span class="sub">JWKS候補鍵ループ検証テスト</span>
+            </button>
+
+            <button type="button" id="btn-sim-kid" class="btn-sim" title="標準仕様: kidを含むトークン">
+              <strong>標準方式 (kid指定)</strong>
+              <span class="sub">鍵ID完全一致による検証</span>
+            </button>
+
+            <button type="button" id="btn-sim-fallback" class="btn-sim" title="トークン未提供時のフォールバック">
+              <strong>フォールバック (OTP)</strong>
+              <span class="sub">トークンなし時の自動切り替え</span>
+            </button>
+
+            <button type="button" id="btn-sim-tamper" class="btn-sim" title="不正改ざんトークンの検出">
+              <strong>改ざんテスト</strong>
+              <span class="sub">暗号署名不一致エラーの確認</span>
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <!-- Right Column: Verification Results & Inspector -->
+      <section class="glass-card" id="result-container" style="display: none;">
+        <h2 class="card-title">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+          </svg>
+          暗号検証インスペクター
+        </h2>
+
+        <!-- Status Banner -->
+        <div id="result-banner" class="result-banner"></div>
+
+        <!-- Fallback OTP Form (displayed when fallback is triggered) -->
+        <div id="otp-card" class="otp-card" style="display: none;">
+          <h4 style="font-size: 0.95rem; font-weight: 700; color: #fbbf24; margin-bottom: 0.35rem;">
+            ワンタイムパスワード (OTP) 入力
+          </h4>
+          <p style="font-size: 0.825rem; color: var(--text-secondary);">
+            トークンが空のため、従来のOTPフローへ移行しました。メールに届いた6桁の確認コードを入力してください。
+          </p>
+          <div class="otp-input-group">
+            <input type="text" id="otp-input" class="form-input otp-input" maxlength="6" placeholder="123456">
+            <button type="button" id="btn-submit-otp" class="btn btn-primary"
+              style="width: auto; padding: 0.6rem 1.2rem;">
+              確認
+            </button>
+          </div>
+          <div id="otp-message" style="margin-top: 0.5rem; font-size: 0.8rem; font-weight: 600;"></div>
+        </div>
+
+        <!-- Tabs -->
+        <div class="tabs">
+          <button class="tab-btn active" data-tab="tab-audit">監査ステップ (Audit Log)</button>
+          <button class="tab-btn" data-tab="tab-claims">トークンクレーム (Decoded Claims)</button>
+        </div>
+
+        <!-- Audit Steps Tab -->
+        <div id="tab-audit" class="tab-content active">
+          <ul id="audit-list" class="audit-list"></ul>
+        </div>
+
+        <!-- Token Claims Tab -->
+        <div id="tab-claims" class="tab-content">
+          <pre id="token-claims-block" class="code-block"></pre>
+        </div>
+      </section>
+    </div>
+
+    <!-- Educational & Technical Specifications Section -->
+    <div class="spec-cards">
+      <div class="spec-card">
+        <h3>1. RFC 9901 SD-JWT + KB</h3>
+        <p>
+          トークンは <code>&lt;Issuer-signed EVT&gt;~&lt;Key Binding JWT&gt;</code> のSelective Disclosure
+          JWT構造を持ちます。ブラウザが生成したエフェメラル公開鍵 <code>cnf.jwk</code> によりリプレイ攻撃を防止します。
+        </p>
+      </div>
+
+      <div class="spec-card">
+        <h3>2. 2026年10月更新: kid省略対応</h3>
+        <p>
+          Gmailなどの一部プロバイダではトークンヘッダーの <code>kid</code> が省略されます。検証サーバーはJWKS内の全候補鍵を反復ループして署名検証を試行するフォールバックロジックを搭載しています。
+        </p>
+      </div>
+
+      <div class="spec-card">
+        <h3>3. DNS 委任検証</h3>
+        <p>
+          <code>_email-verification.&lt;domain&gt;</code> のTXTレコード (<code>iss=&lt;host&gt;</code>) を解決し、EVTの
+          <code>iss</code> クレームが正当な発行者であるかを暗号的・階層的に検証します。
+        </p>
+      </div>
+
+      <div class="spec-card">
+        <h3>4. 安全なOTPフォールバック</h3>
+        <p>
+          Chrome未対応ブラウザやユーザーによる確認スキップ時は、トークンフィールドが空になります。サーバーはこれを検知し、既存のメール送信 (OTP) フローへシームレスにフォールバックします。
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <script src="/js/app.js?v=20261011_5"></script>
+</body>
+
+</html>

@@ -1,0 +1,20 @@
+server:
+  port: 8080
+
+email-verification:
+  verifier:
+    origin: ${VERIFIER_ORIGIN:http://localhost:8080}
+    token-expiration-leeway-seconds: 60
+  mock-issuer:
+    enabled: true
+    origin: ${ISSUER_ORIGIN:http://localhost:8080}
+    supported-domains:
+      - example.com
+      - provider.example
+      - localhost
+      - test.local
+  origin-trial-token: ${ORIGIN_TRIAL_TOKEN:}
+
+logging:
+  level:
+    com.example.emailverification: DEBUG
